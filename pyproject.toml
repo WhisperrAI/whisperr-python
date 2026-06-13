@@ -1,0 +1,38 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "whisperr"
+dynamic = ["version"]
+description = "Whisperr server-side SDK for Python — reliable churn-signal event tracking."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.8"
+authors = [{ name = "Whisperr" }]
+keywords = ["whisperr", "analytics", "churn", "events", "tracking", "retention"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Intended Audience :: Developers",
+  "Topic :: Software Development :: Libraries",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://whisperr.net"
+Repository = "https://github.com/WhisperrAI/whisperr-python"
+
+[project.optional-dependencies]
+django = ["django>=3.2"]
+dev = ["pytest>=7", "django>=3.2"]
+
+[tool.hatch.version]
+path = "src/whisperr/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/whisperr"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
