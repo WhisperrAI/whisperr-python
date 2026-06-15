@@ -137,6 +137,28 @@ def test_retry_exhausted_is_bounded():
     assert any(e.type == "retry_exhausted" for e in errors)
 
 
+def test_failed_events_are_retained_and_retried():
+    # A delivery that fails on auth must keep the events buffered so a later
+    # flush retries the SAME events — they must not be silently dropped.
+    t = FakeTransport(result="auth")
+    # High flush_interval so only our explicit flush() calls drive delivery.
+    w = Whisperr(api_key="wrk_test", transport=t, flush_interval=3600)
+    try:
+        w.track("user_1", "feature_used")
+        w.flush()  # auth → event retained, not delivered
+        attempts_before = len(t.batches)
+
+        t.result = "ok"
+        w.flush()  # retries the retained event, now succeeds
+        attempts_after = len(t.batches)
+    finally:
+        w.shutdown()
+
+    # The event was re-sent after the failure was fixed (retained), not dropped.
+    assert attempts_after == attempts_before + 1
+    assert [e["event_type"] for e in t.batches[-1]] == ["feature_used"]
+
+
 def test_disabled_is_noop():
     t = FakeTransport()
     w = Whisperr(api_key="wrk_test", transport=t, disabled=True)

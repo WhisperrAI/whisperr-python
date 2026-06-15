@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import atexit
-import queue
 import random
 import re
 import sys
 import threading
 import time
 import uuid
+from collections import deque
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from typing import Any, Callable, Deque, Dict, List, Optional, Sequence
 
 from .errors import WhisperrError
 from .transport import Transport
@@ -17,8 +17,6 @@ from .transport import Transport
 DEFAULT_BASE = "https://api.whisperr.net"
 # Mirrors the server's accepted event_type shape.
 _SNAKE = re.compile(r"^[a-z0-9]+(?:_[a-z0-9]+)*$")
-# Sentinel pushed onto the queue to wake + stop the consumer thread.
-_SHUTDOWN = object()
 
 Channel = Dict[str, Any]
 OnError = Callable[[WhisperrError], None]
@@ -53,12 +51,25 @@ class Whisperr:
         self._muted = bool(disabled)
         self._flush_at = flush_at
         self._max_batch = min(max_batch_size, 500)
+        self._max_queue = max_queue_size
         self._max_retries = max_retries
         self._debug = debug
         self._on_error = on_error
         self._flush_interval = flush_interval
-        self._queue: "queue.Queue[Any]" = queue.Queue(maxsize=max_queue_size)
         self._transport = transport or Transport(base_url, api_key, request_timeout, self._warn)
+
+        # Ordered in-memory buffer. A drain pass takes a batch off the front,
+        # delivers it, and only puts it back (at the front) if delivery gives up —
+        # so a failed flush *retains* events for the next flush instead of
+        # dropping them. There's no durable store: a process crash loses unsent
+        # events, which is an acceptable trade for zero I/O on the hot path.
+        self._buf: Deque[Dict[str, Any]] = deque()
+        self._buf_lock = threading.Lock()
+        # Serializes delivery so the background thread and an explicit flush()
+        # never send concurrently (and never fight over the same batch).
+        self._deliver_lock = threading.Lock()
+        self._wake = threading.Event()
+
         self._running = not self._muted
         self._thread: Optional[threading.Thread] = None
 
@@ -123,97 +134,109 @@ class Whisperr:
         )
 
     def flush(self) -> None:
-        """Block until everything currently queued has been delivered (or dropped)."""
+        """Best-effort barrier: deliver everything currently buffered, blocking
+        until the buffer drains or delivery can't proceed (auth/transport
+        failure). Events that can't be delivered stay buffered for the next
+        flush rather than being dropped."""
         if self._muted:
             return
-        self._queue.join()
+        self._drain_once()
 
     def shutdown(self) -> None:
-        """Stop the background thread after delivering what's queued. Idempotent."""
+        """Stop the background thread after a final delivery pass. Idempotent."""
         if self._muted or not self._running:
             return
         self._running = False
-        self._put_sentinel()
+        self._wake.set()
         if self._thread is not None:
             self._thread.join()
 
     # ---- internals ----
 
     def _enqueue(self, op: Dict[str, Any]) -> None:
-        while True:
-            try:
-                self._queue.put_nowait(op)
-                return
-            except queue.Full:
-                try:
-                    self._queue.get_nowait()
-                    self._queue.task_done()
-                    self._emit("dropped", "queue full — dropped 1 oldest event")
-                except queue.Empty:
-                    pass  # drained concurrently; loop and retry the put
-
-    def _put_sentinel(self) -> None:
-        try:
-            self._queue.put_nowait(_SHUTDOWN)
-        except queue.Full:
-            try:
-                self._queue.get_nowait()
-                self._queue.task_done()
-                self._queue.put_nowait(_SHUTDOWN)
-            except (queue.Empty, queue.Full):
-                pass
+        dropped = 0
+        with self._buf_lock:
+            self._buf.append(op)
+            while len(self._buf) > self._max_queue:
+                self._buf.popleft()
+                dropped += 1
+            size = len(self._buf)
+        if dropped:
+            self._emit("dropped", f"queue full — dropped {dropped} oldest event(s)")
+        # Wake the worker to flush early once enough has accumulated.
+        if size >= self._flush_at:
+            self._wake.set()
 
     def _run(self) -> None:
-        while self._running or not self._queue.empty():
+        # Periodic + size-triggered delivery. Always makes one final pass after
+        # shutdown so the loop can't spin on an undeliverable (retained) batch.
+        while True:
+            self._wake.wait(timeout=self._flush_interval)
+            self._wake.clear()
             try:
-                first = self._queue.get(timeout=self._flush_interval)
-            except queue.Empty:
-                continue
-            if first is _SHUTDOWN:
-                self._queue.task_done()
-                continue
-            items = [first]
-            while len(items) < self._max_batch:
-                try:
-                    nxt = self._queue.get_nowait()
-                except queue.Empty:
-                    break
-                if nxt is _SHUTDOWN:
-                    self._queue.task_done()
-                    self._running = False
-                    break
-                items.append(nxt)
-            self._deliver_items(items)
+                self._drain_once()
+            except Exception:
+                pass  # never let the worker thread die on a delivery error
+            if not self._running:
+                return
 
-    def _deliver_items(self, items: List[Dict[str, Any]]) -> None:
-        tracks = [x for x in items if x["kind"] == "track"]
-        idents = [x for x in items if x["kind"] == "identify"]
-        try:
-            if tracks:
-                self._deliver(lambda: self._transport.send_batch(tracks), len(tracks))
-            for op in idents:
-                self._deliver(lambda op=op: self._transport.send_identify(op), 1)
-        finally:
-            for _ in items:
-                self._queue.task_done()
+    def _take_batch(self) -> List[Dict[str, Any]]:
+        """Remove and return the next batch from the front of the buffer.
 
-    def _deliver(self, send: Callable[[], str], count: int) -> None:
+        An identify is sent on its own; track ops are grouped into a leading run
+        (up to ``max_batch``). Returns ``[]`` when the buffer is empty."""
+        with self._buf_lock:
+            if not self._buf:
+                return []
+            if self._buf[0]["kind"] == "identify":
+                return [self._buf.popleft()]
+            batch: List[Dict[str, Any]] = []
+            while self._buf and len(batch) < self._max_batch and self._buf[0]["kind"] == "track":
+                batch.append(self._buf.popleft())
+            return batch
+
+    def _requeue_front(self, batch: List[Dict[str, Any]]) -> None:
+        with self._buf_lock:
+            self._buf.extendleft(reversed(batch))
+
+    def _drain_once(self) -> None:
+        # One delivery pass, serialized against the background thread.
+        with self._deliver_lock:
+            while True:
+                batch = self._take_batch()
+                if not batch:
+                    return
+                result = self._deliver(batch)
+                if result in ("ok", "drop"):
+                    continue
+                # auth / retry_exhausted: hand the batch back to the front and
+                # stop; a later flush retries from where we left off.
+                self._requeue_front(batch)
+                return
+
+    def _deliver(self, batch: List[Dict[str, Any]]) -> str:
+        if batch[0]["kind"] == "identify":
+            send: Callable[[], str] = lambda: self._transport.send_identify(batch[0])
+            count = 1
+        else:
+            send = lambda: self._transport.send_batch(batch)
+            count = len(batch)
         retries = 0
         while True:
             result = send()
             if result == "ok":
-                return
+                return "ok"
             if result == "drop":
                 self._emit("dropped", f"dropped {count} event(s) — rejected by server")
-                return
+                return "drop"
             if result == "auth":
                 self._emit("auth", "delivery paused — API key rejected", 401)
-                return
+                return "auth"
             retries += 1
             # Stop early when shutting down so exit isn't held up by backoff.
             if retries > self._max_retries or not self._running:
-                self._emit("retry_exhausted", "delivery failed after retries")
-                return
+                self._emit("retry_exhausted", "delivery failed after retries; will retry on next flush")
+                return "retry_exhausted"
             time.sleep(_backoff(retries))
 
     def _emit(self, type_: str, message: str, status: Optional[int] = None) -> None:
