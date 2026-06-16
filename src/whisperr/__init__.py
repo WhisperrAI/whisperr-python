@@ -15,4 +15,4 @@ from .client import Whisperr
 from .errors import WhisperrError
 
 __all__ = ["Whisperr", "WhisperrError", "__version__"]
-__version__ = "0.1.0"
+__version__ = "0.1.1"
