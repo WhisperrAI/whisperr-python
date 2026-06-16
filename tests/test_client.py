@@ -101,6 +101,22 @@ def test_track_requires_user_and_event_type():
     assert t.batches == []
 
 
+def test_invalid_event_type_is_dropped_before_it_can_poison_batch():
+    t = FakeTransport()
+    errors = []
+    w = make_client(t, on_error=errors.append)
+    try:
+        w.track("user_1", "User Signed Up")
+        w.track("user_1", "checkout_completed")
+        w.flush()
+    finally:
+        w.shutdown()
+
+    assert any(e.type == "dropped" for e in errors)
+    events = [e for batch in t.batches for e in batch]
+    assert [e["event_type"] for e in events] == ["checkout_completed"]
+
+
 def test_auth_failure_emits_and_stops():
     t = FakeTransport(result="auth")
     errors = []
@@ -219,6 +235,19 @@ def test_transport_identify_channel_mapping(monkeypatch):
     )
     assert captured["url"] == "https://api.whisperr.net/v1/identify"
     assert captured["body"]["channels"] == [{"channel": "email", "address": "a@b.com", "opted_in": True}]
+
+
+def test_transport_accepts_wire_shaped_explicit_channels(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(urllib.request, "urlopen", _capture_urlopen(captured))
+    t = Transport("https://api.whisperr.net", "wrk_test", 10, lambda m: None)
+    t.send_identify(
+        {"external_user_id": "u1",
+         "channels": [{"channel": "sms", "address": "+15551234567", "verified": True}]}
+    )
+    assert captured["body"]["channels"] == [
+        {"channel": "sms", "address": "+15551234567", "opted_in": True, "verified": True}
+    ]
 
 
 @pytest.mark.parametrize("code,expected", [(401, "auth"), (403, "auth"), (429, "retry"), (500, "retry"), (400, "drop"), (422, "drop")])

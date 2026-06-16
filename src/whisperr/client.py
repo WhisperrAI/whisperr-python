@@ -119,8 +119,13 @@ class Whisperr:
         """Record a product event for a known user."""
         if self._muted or not external_user_id or not event_type:
             return
-        if self._debug and not _SNAKE.match(event_type):
-            self._warn(f'event_type "{event_type}" is not snake_case — the server will reject it')
+        event_type = event_type.strip()
+        if not event_type:
+            return
+        if not _SNAKE.match(event_type):
+            self._emit("dropped", f'invalid event_type "{event_type}" — expected snake_case')
+            self._warn(f'invalid event_type "{event_type}" — event was not queued')
+            return
         self._enqueue(
             {
                 "kind": "track",

@@ -23,11 +23,17 @@ jobs:
     environment: pypi
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: WhisperrAI/whisperr-spec
+          path: whisperr-spec
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: python -m pip install --upgrade pip build
       - run: pip install -e ".[dev]"
       - run: pytest -q
+        env:
+          WHISPERR_SPEC_PATH: ${{ github.workspace }}/whisperr-spec/conformance/wire.json
       - run: python -m build
       - uses: pypa/gh-action-pypi-publish@release/v1

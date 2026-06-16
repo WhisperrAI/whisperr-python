@@ -57,7 +57,7 @@ class Transport:
         if channels:
             body["channels"] = [
                 {
-                    "channel": c["type"],
+                    "channel": c.get("type") or c["channel"],
                     "address": c["address"],
                     "opted_in": c.get("opted_in", True),
                     **({"verified": c["verified"]} if "verified" in c else {}),
