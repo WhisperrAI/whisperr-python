@@ -63,10 +63,15 @@ def test_sdk_version_matches_the_package_metadata():
 def test_billing_event_names():
     names = sorted(v for k, v in vars(BillingEvent).items() if k.isupper())
     assert names == [
-        "payment_failed",
-        "purchase_completed",
-        "subscription_cancelled",
-        "subscription_renewed",
-        "subscription_started",
+        "auto_renew_disabled",
+        "auto_renew_enabled",
+        "billing_issue_started",
+        "billing_recovered",
+        "membership_ended",
+        "membership_started",
+        "refund_granted",
+        "renewal_succeeded",
+        "trial_auto_renew_disabled",
+        "trial_converted",
         "trial_started",
     ]
