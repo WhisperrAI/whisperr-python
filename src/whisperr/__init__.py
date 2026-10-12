@@ -11,8 +11,9 @@ trial expiry, usage drops), so this is where Whisperr gets its best signal.
     whisperr.shutdown()  # flush before the process exits
 """
 
-from .client import Whisperr
+from ._version import __version__
+from .billing import BillingEvent
+from .client import SDK_NAME, Whisperr
 from .errors import WhisperrError
 
-__all__ = ["Whisperr", "WhisperrError", "__version__"]
-__version__ = "0.1.1"
+__all__ = ["BillingEvent", "SDK_NAME", "Whisperr", "WhisperrError", "__version__"]

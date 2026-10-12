@@ -37,6 +37,7 @@ def get_client() -> Whisperr:
             base_url=getattr(settings, "WHISPERR_BASE_URL", "https://api.whisperr.net"),
             disabled=getattr(settings, "WHISPERR_DISABLED", False),
             debug=getattr(settings, "WHISPERR_DEBUG", False),
+            app_version=getattr(settings, "WHISPERR_APP_VERSION", None),
         )
     return _client
 
