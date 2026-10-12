@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0
+## 0.2.0 - 2026-10-12
 
 - Every event now carries `context.sdk_name` (`whisperr-python`) and
   `context.sdk_version`.
