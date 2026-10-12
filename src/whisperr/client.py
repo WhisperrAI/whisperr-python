@@ -11,10 +11,13 @@ from collections import deque
 from datetime import datetime, timezone
 from typing import Any, Callable, Deque, Dict, List, Optional, Sequence
 
+from ._version import __version__
 from .errors import WhisperrError
 from .transport import Transport
 
 DEFAULT_BASE = "https://api.whisperr.net"
+# The context.sdk_name value on every event this SDK sends.
+SDK_NAME = "whisperr-python"
 # Mirrors the server's accepted event_type shape.
 _SNAKE = re.compile(r"^[a-z0-9]+(?:_[a-z0-9]+)*$")
 
@@ -35,6 +38,7 @@ class Whisperr:
         api_key: str,
         *,
         base_url: str = DEFAULT_BASE,
+        app_version: Optional[str] = None,
         flush_at: int = 20,
         flush_interval: float = 10.0,
         max_queue_size: int = 10000,
@@ -57,6 +61,10 @@ class Whisperr:
         self._on_error = on_error
         self._flush_interval = flush_interval
         self._transport = transport or Transport(base_url, api_key, request_timeout, self._warn)
+        # Context keys added to every event. No value, no key.
+        self._environment: Dict[str, str] = {"sdk_name": SDK_NAME, "sdk_version": __version__}
+        if app_version and app_version.strip():
+            self._environment["app_version"] = app_version.strip()
 
         # Ordered in-memory buffer. A drain pass takes a batch off the front,
         # delivers it, and only puts it back (at the front) if delivery gives up —
@@ -116,7 +124,11 @@ class Whisperr:
         properties: Optional[Dict[str, Any]] = None,
         context: Optional[Dict[str, Any]] = None,
     ) -> None:
-        """Record a product event for a known user."""
+        """Record a product event for a known user.
+
+        Every event carries ``context.sdk_name``, ``context.sdk_version`` and,
+        when configured, ``context.app_version``. A key in ``context`` wins
+        over these SDK keys."""
         if self._muted or not external_user_id or not event_type:
             return
         event_type = event_type.strip()
@@ -132,7 +144,8 @@ class Whisperr:
                 "external_user_id": external_user_id,
                 "event_type": event_type,
                 "properties": properties,
-                "context": context,
+                # A key the caller passes in context wins over the SDK's key.
+                "context": {**self._environment, **(context or {})},
                 "occurred_at": _now_iso(),
                 "message_id": uuid.uuid4().hex,
             }

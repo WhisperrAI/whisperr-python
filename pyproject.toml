@@ -29,7 +29,7 @@ django = ["django>=3.2"]
 dev = ["pytest>=7", "django>=3.2"]
 
 [tool.hatch.version]
-path = "src/whisperr/__init__.py"
+path = "src/whisperr/_version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/whisperr"]
