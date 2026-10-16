@@ -4,6 +4,7 @@ import urllib.request
 
 import pytest
 
+import whisperr
 from whisperr import Whisperr, WhisperrError
 from whisperr.transport import Transport
 
@@ -220,6 +221,8 @@ def test_transport_batch_wire_shape(monkeypatch):
     assert result == "ok"
     assert captured["url"] == "https://api.whisperr.net/v1/events/batch"
     assert captured["headers"]["x-api-key"] == "wrk_test"
+    # Not urllib's default "Python-urllib/3.x": Cloudflare answers that with 403 (error 1010).
+    assert captured["headers"]["user-agent"] == f"whisperr-python/{whisperr.__version__}"
     ev = captured["body"]["events"][0]
     assert ev["external_user_id"] == "u1"
     assert ev["context"] == {"k": "v", "$message_id": "mid1"}
@@ -234,6 +237,7 @@ def test_transport_identify_channel_mapping(monkeypatch):
          "channels": [{"type": "email", "address": "a@b.com", "opted_in": True}]}
     )
     assert captured["url"] == "https://api.whisperr.net/v1/identify"
+    assert captured["headers"]["user-agent"].startswith("whisperr-python/")
     assert captured["body"]["channels"] == [{"channel": "email", "address": "a@b.com", "opted_in": True}]
 
 

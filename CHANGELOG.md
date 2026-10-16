@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Every request sends `User-Agent: whisperr-python/<version>`. Before, urllib
+  sent `Python-urllib/3.x`, which Cloudflare in front of `api.whisperr.net`
+  answers with 403 (error 1010). The SDK reported that as a rejected API key
+  and sent nothing.
+
 ## 0.2.0 - 2026-10-12
 
 - Every event now carries `context.sdk_name` (`whisperr-python`) and
