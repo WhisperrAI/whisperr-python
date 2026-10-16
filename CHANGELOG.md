@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.1 - 2026-10-16
 
 - Every request sends `User-Agent: whisperr-python/<version>`. Before, urllib
   sent `Python-urllib/3.x`, which Cloudflare in front of `api.whisperr.net`
