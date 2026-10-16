@@ -5,6 +5,13 @@ import urllib.error
 import urllib.request
 from typing import Any, Callable, Dict, List
 
+from ._version import __version__
+
+# Sent on every request. Cloudflare in front of api.whisperr.net refuses
+# urllib's default "Python-urllib/3.x" with 403 (error 1010), which the SDK
+# would report as a rejected API key.
+USER_AGENT = f"whisperr-python/{__version__}"
+
 # Delivery outcome of one request, mirroring the @whisperr/node SDK:
 #   "ok"    — delivered
 #   "retry" — transient (429, 5xx, network/timeout)
@@ -72,7 +79,7 @@ class Transport:
             self._base + path,
             data=data,
             method="POST",
-            headers={"Content-Type": "application/json", "X-API-Key": self._key},
+            headers={"Content-Type": "application/json", "X-API-Key": self._key, "User-Agent": USER_AGENT},
         )
         try:
             with urllib.request.urlopen(req, timeout=self._timeout):
