@@ -20,7 +20,9 @@ whisperr = Whisperr(api_key=os.environ["WHISPERR_API_KEY"])
 # A server-side churn signal:
 whisperr.track("user_8842", "payment_failed", {"amount_cents": 4900, "reason": "card_declined"})
 
-# Associate traits / contact channels with a user:
+# Associate traits / contact channels with a user.
+# The email shortcut marks the address opted in. Send it only for a user
+# who agreed to email, according to your own records.
 whisperr.identify("user_8842", email="ada@example.com", traits={"plan": "pro"})
 
 # Deliver everything before the process exits:
