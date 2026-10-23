@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.3.0 - 2026-10-23
+
+- New `whisperr.catalog` client for catalog push (whisperr-go catalog v2):
+  `upsert(items)`, `delete(ids_or_items, deleted_at=None)`,
+  `begin_snapshot()`, `complete_snapshot(snapshot_id, item_count)`,
+  `heartbeat(item_count)` and `status()`. Server key only: a `wpk_` key raises
+  `WhisperrConfigurationError` before any request. Calls block until Whisperr
+  answers; they are not queued.
+- Upserts are chunked at 500 items and 2 MiB, deletes at 1000. Rejected items
+  come back with their index in the list you passed. A 413 splits the chunk.
+- 429, 5xx and network errors are retried with backoff, honoring
+  `Retry-After`. Retries resend the same body; `delete` uses one `deleted_at`
+  per call. Refusals and exhausted retries raise `WhisperrCatalogError` with
+  `status`, `code`, `retryable` and, for upsert and delete, `partial`.
+  Catalog requests never follow redirects.
+- `CatalogClient` for a catalog client without the event queue. New options
+  `catalog_max_retries` and `catalog_timeout`.
+- `to_minor_units(amount, currency)` and `currency_exponent(currency)` with the
+  ISO 4217 exponents the server uses. They raise instead of rounding.
+- Tests run `tests/fixtures/catalog_push.json`, a byte-identical copy of
+  whisperr-spec `conformance/catalog_push.json` (`WHISPERR_CATALOG_SPEC_PATH`
+  runs a spec checkout's file and checks the copy has not drifted). It pins
+  error bodies as the server sends them (`{"error":{"code","message"}}`), the
+  409 `snapshot_open` heartbeat refusal, the 404 feature-detect, the 413
+  split, and `item_too_large` as the one client-side reject code.
+
 ## 0.2.1 - 2026-10-16
 
 - Every request sends `User-Agent: whisperr-python/<version>`. Before, urllib

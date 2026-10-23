@@ -179,6 +179,96 @@ whisperr.track(
 > the server accepts them without registration, an unregistered name is not
 > stored.
 
+## Catalog push
+
+Send your product catalog (or courses, content, plans) to Whisperr from your
+server, so messages can name real, in-stock items. Use a **server key**
+(`wrk_…`, Settings > API keys) from an environment variable such as
+`WHISPERR_SERVER_KEY`. Never commit or log it. A publishable key (`wpk_…`)
+raises `WhisperrConfigurationError` before anything is sent.
+
+Items and results use the wire field names (snake_case), so a dict you build
+is exactly what Whisperr receives.
+
+```python
+import os
+from whisperr import Whisperr, to_minor_units
+
+whisperr = Whisperr(api_key=os.environ["WHISPERR_SERVER_KEY"])
+
+# When a product is created or changes:
+result = whisperr.catalog.upsert([
+    {
+        "source_item_id": "sku-1",  # the same id you send as product_id in tracked events
+        "type": "product",
+        "name": "Trail Runner 2",
+        "url": "https://shop.example.com/products/trail-runner-2",
+        "availability": "available",  # available | limited | unavailable | unknown
+        "updated_at": product.updated_at,  # a datetime or RFC 3339 string from your data
+        "price": {"amount_minor": to_minor_units("89.00", "USD"), "currency": "USD"},
+        "image_url": "https://cdn.example.com/trail-runner-2.jpg",
+        "compare_at_minor": to_minor_units("110.00", "USD"),
+        "product_type": "Running shoes",
+        "brand": "Acme",
+        "collections": [{"id": "running", "name": "Running", "url": "https://shop.example.com/collections/running"}],
+        "tags": ["summer"],
+        "extras": {"color": "blue"},
+    },
+])
+# {"accepted", "applied", "unchanged", "ignored_older", "rejected": [{"index", "source_item_id", "code", "message"}]}
+
+# When products are removed:
+whisperr.catalog.delete(["sku-1", "sku-2"])
+
+# Full sync (daily, or after a bulk import): items you do not upsert between
+# begin and complete are removed.
+snapshot = whisperr.catalog.begin_snapshot()
+for page in all_product_pages():
+    whisperr.catalog.upsert(page)
+whisperr.catalog.complete_snapshot(snapshot["snapshot_id"], total_count)
+
+# Every 30 minutes, so Whisperr knows the catalog is still current. Not
+# while a full sync is open: complete the snapshot first (409 snapshot_open).
+whisperr.catalog.heartbeat(total_count)
+
+# Health of the pushed catalog:
+health = whisperr.catalog.status()  # {"state": "ready", "item_count": ..., "last_push_at": ...}
+```
+
+`CatalogClient(api_key, base_url=..., max_retries=5, timeout=30.0)` is the same
+client without the event queue and its background thread.
+
+How it behaves:
+
+- **Sent right away, not queued.** Each call blocks until Whisperr has
+  answered. You do not need `flush()` for catalog calls.
+- **Chunked.** Upserts go in batches of 500 items (and at most 2 MiB per
+  request), deletes in batches of 1000. A `rejected[]["index"]` is the index in
+  the list you passed. If a request still comes back 413, the chunk is split
+  in halves and resent; a single item that cannot fit is listed in `rejected`
+  with the code `item_too_large`. That code comes from the SDK, never from the
+  server; every other `rejected` code is the server's (`invalid_item`,
+  `missing_field`, `invalid_url`, `url_host_not_allowed`, `invalid_image_url`,
+  `invalid_price`, `invalid_currency`, `invalid_kind`, `revision_conflict`).
+- **Retried.** 429, 5xx and network errors are retried with backoff (default 5
+  retries), honoring `Retry-After`. When retries run out, the call raises
+  `WhisperrCatalogError` with `retryable=True`; for upsert and delete,
+  `error.partial` holds what earlier chunks already did.
+- **Safe to repeat.** A retry sends the same body. Whisperr keeps the newest
+  write per item by `updated_at` (deletes by `deleted_at`), so a repeated or
+  late call never overwrites newer data. `delete` uses one `deleted_at` for the
+  whole call (default: now). Always set `updated_at` from your own data, not
+  from the time of the call. A naive datetime is read as UTC.
+- **Refusals raise.** A refused call raises `WhisperrCatalogError` with the
+  HTTP `status` and the server `code`, for example `server_key_required`,
+  `catalog_push_disabled` (the owner turned push off in the dashboard),
+  `snapshot_not_open`, or `snapshot_open` (a heartbeat while a full sync is
+  open). A 404 `route_not_implemented` means the push API is not on for this
+  deployment yet.
+- Only send the fields in the catalog item schema: no descriptions, no image
+  bytes. Prices are integer minor units; `to_minor_units(amount, currency)`
+  converts using the ISO 4217 exponent and raises rather than round.
+
 ## Short-lived processes
 
 In scripts, serverless handlers, or management commands, call `flush()` (or
@@ -205,6 +295,8 @@ whisperr.flush()
 | `disabled` | `False` | No-op client (useful in tests). |
 | `debug` | `False` | Verbose logging to stderr. |
 | `on_error` | — | `Callable[[WhisperrError], None]` for observability. |
+| `catalog_max_retries` | `5` | Catalog call retries on 429, 5xx and network errors. |
+| `catalog_timeout` | `30.0` | Per-request timeout for catalog calls (seconds). |
 
 ---
 
