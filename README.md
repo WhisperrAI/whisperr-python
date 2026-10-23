@@ -227,7 +227,8 @@ for page in all_product_pages():
     whisperr.catalog.upsert(page)
 whisperr.catalog.complete_snapshot(snapshot["snapshot_id"], total_count)
 
-# Every 30 minutes, so Whisperr knows the catalog is still current:
+# Every 30 minutes, so Whisperr knows the catalog is still current. Not
+# while a full sync is open: complete the snapshot first (409 snapshot_open).
 whisperr.catalog.heartbeat(total_count)
 
 # Health of the pushed catalog:
@@ -243,7 +244,12 @@ How it behaves:
   answered. You do not need `flush()` for catalog calls.
 - **Chunked.** Upserts go in batches of 500 items (and at most 2 MiB per
   request), deletes in batches of 1000. A `rejected[]["index"]` is the index in
-  the list you passed.
+  the list you passed. If a request still comes back 413, the chunk is split
+  in halves and resent; a single item that cannot fit is listed in `rejected`
+  with the code `item_too_large`. That code comes from the SDK, never from the
+  server; every other `rejected` code is the server's (`invalid_item`,
+  `missing_field`, `invalid_url`, `url_host_not_allowed`, `invalid_image_url`,
+  `invalid_price`, `invalid_currency`, `invalid_kind`, `revision_conflict`).
 - **Retried.** 429, 5xx and network errors are retried with backoff (default 5
   retries), honoring `Retry-After`. When retries run out, the call raises
   `WhisperrCatalogError` with `retryable=True`; for upsert and delete,
@@ -255,8 +261,10 @@ How it behaves:
   from the time of the call. A naive datetime is read as UTC.
 - **Refusals raise.** A refused call raises `WhisperrCatalogError` with the
   HTTP `status` and the server `code`, for example `server_key_required`,
-  `catalog_push_disabled` (the owner turned push off in the dashboard) or
-  `snapshot_not_open`.
+  `catalog_push_disabled` (the owner turned push off in the dashboard),
+  `snapshot_not_open`, or `snapshot_open` (a heartbeat while a full sync is
+  open). A 404 `route_not_implemented` means the push API is not on for this
+  deployment yet.
 - Only send the fields in the catalog item schema: no descriptions, no image
   bytes. Prices are integer minor units; `to_minor_units(amount, currency)`
   converts using the ISO 4217 exponent and raises rather than round.

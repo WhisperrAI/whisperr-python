@@ -49,7 +49,7 @@ Time = Union[datetime, str]
 class CatalogRejection(TypedDict):
     index: int  # index into the list you passed, not into one chunk
     source_item_id: str
-    code: str
+    code: str  # a server reject code, or item_too_large, which only the SDK writes
     message: str
 
 
@@ -201,7 +201,10 @@ class CatalogClient:
 
     def heartbeat(self, item_count: int) -> Dict[str, Any]:
         """Tell Whisperr the catalog is still current. Send every 30 minutes
-        with your live item count. Returns ``{"refreshed": bool, ...}``."""
+        with your live item count. Returns ``{"refreshed": bool, ...}``.
+
+        Refused with 409 ``snapshot_open`` while a full sync is open: complete
+        the snapshot first."""
         self._check_key()
         _check_count(item_count)
         res = self._request("POST", "/v1/catalog/heartbeat", _encode({"item_count": item_count}))

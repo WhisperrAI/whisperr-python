@@ -22,9 +22,9 @@ class WhisperrCatalogError(Exception):
 
     ``status`` is the HTTP status (0 for a network error or timeout), ``code``
     the server's error code (``server_key_required``, ``catalog_push_disabled``,
-    ``snapshot_not_open``, ...) or ``network_error``. ``retryable`` is true when
-    retries ran out on a transient failure. For upsert and delete, ``partial``
-    holds what earlier chunks already did.
+    ``snapshot_not_open``, ``snapshot_open``, ...) or ``network_error``.
+    ``retryable`` is true when retries ran out on a transient failure. For
+    upsert and delete, ``partial`` holds what earlier chunks already did.
     """
 
     def __init__(

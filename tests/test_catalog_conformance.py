@@ -1,8 +1,10 @@
 """Catalog push conformance (fixtures/catalog_push.json).
 
-whisperr-spec conformance/catalog_push.json wins when WHISPERR_CATALOG_SPEC_PATH
-points at it; until the spec publishes it, the bundled copy is the contract.
-Python items and results use the wire names, so fixture inputs are passed as is.
+tests/fixtures/catalog_push.json is a byte-identical copy of whisperr-spec
+conformance/catalog_push.json. Point WHISPERR_CATALOG_SPEC_PATH at a spec
+checkout's file to run that copy instead and to check the bundled one has not
+drifted from it. Python items and results use the wire names, so fixture
+inputs are passed as is.
 """
 
 import json
@@ -14,9 +16,25 @@ import pytest
 from whisperr import CatalogClient, WhisperrCatalogError, WhisperrConfigurationError, to_minor_units
 
 HERE = os.path.dirname(__file__)
-PATH = os.environ.get("WHISPERR_CATALOG_SPEC_PATH") or os.path.join(HERE, "fixtures", "catalog_push.json")
+BUNDLED = os.path.join(HERE, "fixtures", "catalog_push.json")
+SPEC_PATH = os.environ.get("WHISPERR_CATALOG_SPEC_PATH")
+PATH = SPEC_PATH or BUNDLED
 with open(PATH) as f:
     SPEC = json.load(f)
+# Client-side reject codes carry an SDK-defined message.
+CLIENT_CODES = set(SPEC["reject_codes"]["client"])
+
+
+def _expected_result(case, result):
+    want = json.loads(json.dumps(case["result"]))
+    if isinstance(want.get("rejected"), list) and isinstance(result, dict):
+        for i, r in enumerate(want["rejected"]):
+            if r["code"] in CLIENT_CODES:
+                got = result.get("rejected", [])[i] if i < len(result.get("rejected", [])) else {}
+                message = got.get("message")
+                assert isinstance(message, str) and message.strip(), "a client-side reject needs a message"
+                r["message"] = message
+    return want
 
 
 def _run(case, sent):
@@ -98,7 +116,7 @@ def test_catalog_case(case):
     else:
         if error:
             raise error
-        assert result == case["result"]
+        assert result == _expected_result(case, result)
 
 
 @pytest.mark.parametrize("m", SPEC["minor_units"], ids=[f"{m['amount']} {m['currency']}" for m in SPEC["minor_units"]])
@@ -108,3 +126,15 @@ def test_minor_units(m):
             to_minor_units(m["amount"], m["currency"])
     else:
         assert to_minor_units(m["amount"], m["currency"]) == m["minor"]
+
+
+@pytest.mark.skipif(not SPEC_PATH, reason="WHISPERR_CATALOG_SPEC_PATH is not set")
+def test_bundled_fixture_is_byte_identical_to_the_spec_copy():
+    with open(BUNDLED, "rb") as a, open(SPEC_PATH, "rb") as b:
+        assert a.read() == b.read()
+
+
+def test_the_only_sdk_written_reject_code_is_listed_as_client_side():
+    # item_too_large is the only code the SDK adds; the server never sends it.
+    assert SPEC["reject_codes"]["client"] == ["item_too_large"]
+    assert "item_too_large" not in SPEC["reject_codes"]["server"]
