@@ -1,0 +1,504 @@
+{
+  "contract": "catalog-v2/1",
+  "description": "Server SDK conformance for the catalog push API (whisperr-go catalog v2 contract, section 6). Every SDK sends these exact requests for these calls and returns these results. Item inputs are given in the wire shape; each SDK test converts them to its own field naming before calling the SDK. Results are given in the wire shape too.",
+  "limits": {
+    "upsert_batch": 500,
+    "delete_batch": 1000,
+    "max_body_bytes": 2097152
+  },
+  "minor_units": [
+    { "amount": "15.00", "currency": "USD", "minor": 1500 },
+    { "amount": "15", "currency": "USD", "minor": 1500 },
+    { "amount": "0.5", "currency": "EUR", "minor": 50 },
+    { "amount": "19.990", "currency": "USD", "minor": 1999 },
+    { "amount": "2.50", "currency": "usd", "minor": 250 },
+    { "amount": "0", "currency": "GBP", "minor": 0 },
+    { "amount": "1500", "currency": "JPY", "minor": 1500 },
+    { "amount": "1500.00", "currency": "KRW", "minor": 1500 },
+    { "amount": "1.234", "currency": "KWD", "minor": 1234 },
+    { "amount": "1.5", "currency": "CLF", "minor": 15000 },
+    { "amount": "9.999", "currency": "USD", "error": "invalid_amount" },
+    { "amount": "1.5", "currency": "JPY", "error": "invalid_amount" },
+    { "amount": "-1.00", "currency": "USD", "error": "invalid_amount" },
+    { "amount": "abc", "currency": "USD", "error": "invalid_amount" },
+    { "amount": "", "currency": "USD", "error": "invalid_amount" },
+    { "amount": "1.00", "currency": "US", "error": "invalid_currency" },
+    { "amount": "1.00", "currency": "US1", "error": "invalid_currency" }
+  ],
+  "cases": [
+    {
+      "name": "upsert_minimal_item",
+      "op": "upsert",
+      "args": {
+        "items": [
+          {
+            "source_item_id": "sku-1",
+            "type": "product",
+            "name": "Trail Runner 2",
+            "availability": "available",
+            "updated_at": "2026-10-23T09:00:00Z"
+          }
+        ]
+      },
+      "exchanges": [
+        {
+          "request": {
+            "method": "POST",
+            "path": "/v1/catalog/items/batch",
+            "body": {
+              "items": [
+                {
+                  "source_item_id": "sku-1",
+                  "type": "product",
+                  "name": "Trail Runner 2",
+                  "availability": "available",
+                  "updated_at": "2026-10-23T09:00:00Z"
+                }
+              ]
+            }
+          },
+          "response": {
+            "status": 200,
+            "body": { "accepted": 1, "applied": 1, "unchanged": 0, "ignored_older": 0, "rejected": [] }
+          }
+        }
+      ],
+      "result": { "accepted": 1, "applied": 1, "unchanged": 0, "ignored_older": 0, "rejected": [] }
+    },
+    {
+      "name": "upsert_full_v2_item",
+      "op": "upsert",
+      "args": {
+        "items": [
+          {
+            "source_item_id": "sku-1",
+            "type": "product",
+            "kind": "product",
+            "name": "Trail Runner 2",
+            "url": "https://shop.example.com/products/trail-runner-2",
+            "availability": "available",
+            "updated_at": "2026-10-23T09:00:00.250Z",
+            "price": { "amount_minor": 8900, "currency": "USD" },
+            "category": "shoes",
+            "source_version": "v7",
+            "localizations": { "pt-BR": { "name": "Tenis Trail Runner 2" } },
+            "action": { "version": 1, "type": "view_item", "target": { "kind": "product", "id": "sku-1" } },
+            "image_url": "https://cdn.example.com/trail-runner-2.jpg",
+            "compare_at_minor": 11000,
+            "price_min_minor": 8900,
+            "price_max_minor": 9900,
+            "currency": "USD",
+            "any_variant_in_stock": true,
+            "product_type": "Running shoes",
+            "brand": "Acme",
+            "collections": [
+              { "id": "running", "name": "Running", "handle": "running", "url": "https://shop.example.com/collections/running" },
+              { "id": "sale", "name": "Sale" }
+            ],
+            "tags": ["summer", "trail"],
+            "extras": { "color": "blue", "age_group": "adult" },
+            "published_at": "2026-09-01T00:00:00Z",
+            "gift_card": false,
+            "variants": [
+              { "variant_id": "sku-1-42", "title": "EU 42", "availability": "available", "price_minor": 8900, "compare_at_minor": 11000 },
+              { "variant_id": "sku-1-43", "availability": "unavailable", "price_minor": 9900 }
+            ]
+          }
+        ]
+      },
+      "exchanges": [
+        {
+          "request": {
+            "method": "POST",
+            "path": "/v1/catalog/items/batch",
+            "body": {
+              "items": [
+                {
+                  "source_item_id": "sku-1",
+                  "type": "product",
+                  "kind": "product",
+                  "name": "Trail Runner 2",
+                  "url": "https://shop.example.com/products/trail-runner-2",
+                  "availability": "available",
+                  "updated_at": "2026-10-23T09:00:00.250Z",
+                  "price": { "amount_minor": 8900, "currency": "USD" },
+                  "category": "shoes",
+                  "source_version": "v7",
+                  "localizations": { "pt-BR": { "name": "Tenis Trail Runner 2" } },
+                  "action": { "version": 1, "type": "view_item", "target": { "kind": "product", "id": "sku-1" } },
+                  "image_url": "https://cdn.example.com/trail-runner-2.jpg",
+                  "compare_at_minor": 11000,
+                  "price_min_minor": 8900,
+                  "price_max_minor": 9900,
+                  "currency": "USD",
+                  "any_variant_in_stock": true,
+                  "product_type": "Running shoes",
+                  "brand": "Acme",
+                  "collections": [
+                    { "id": "running", "name": "Running", "handle": "running", "url": "https://shop.example.com/collections/running" },
+                    { "id": "sale", "name": "Sale" }
+                  ],
+                  "tags": ["summer", "trail"],
+                  "extras": { "color": "blue", "age_group": "adult" },
+                  "published_at": "2026-09-01T00:00:00Z",
+                  "gift_card": false,
+                  "variants": [
+                    { "variant_id": "sku-1-42", "title": "EU 42", "availability": "available", "price_minor": 8900, "compare_at_minor": 11000 },
+                    { "variant_id": "sku-1-43", "availability": "unavailable", "price_minor": 9900 }
+                  ]
+                }
+              ]
+            }
+          },
+          "response": {
+            "status": 200,
+            "body": { "accepted": 1, "applied": 0, "unchanged": 1, "ignored_older": 0, "rejected": [] }
+          }
+        }
+      ],
+      "result": { "accepted": 1, "applied": 0, "unchanged": 1, "ignored_older": 0, "rejected": [] }
+    },
+    {
+      "name": "upsert_reports_rejected_items",
+      "op": "upsert",
+      "args": {
+        "items": [
+          { "source_item_id": "sku-1", "type": "product", "name": "One", "availability": "available", "updated_at": "2026-10-23T09:00:00Z" },
+          { "source_item_id": "sku-2", "type": "product", "name": "Two", "availability": "available", "updated_at": "2026-10-23T09:00:00Z", "url": "https://elsewhere.example.net/two" },
+          { "source_item_id": "sku-3", "type": "product", "name": "Three", "availability": "limited", "updated_at": "2026-10-23T08:00:00Z" }
+        ]
+      },
+      "exchanges": [
+        {
+          "request": { "method": "POST", "path": "/v1/catalog/items/batch", "item_ids": ["sku-1", "sku-2", "sku-3"] },
+          "response": {
+            "status": 200,
+            "body": {
+              "accepted": 2,
+              "applied": 1,
+              "unchanged": 0,
+              "ignored_older": 1,
+              "rejected": [
+                { "index": 1, "source_item_id": "sku-2", "code": "url_host_not_allowed", "message": "url host elsewhere.example.net is not allowed" }
+              ]
+            }
+          }
+        }
+      ],
+      "result": {
+        "accepted": 2,
+        "applied": 1,
+        "unchanged": 0,
+        "ignored_older": 1,
+        "rejected": [
+          { "index": 1, "source_item_id": "sku-2", "code": "url_host_not_allowed", "message": "url host elsewhere.example.net is not allowed" }
+        ]
+      }
+    },
+    {
+      "name": "upsert_chunks_at_500_and_maps_reject_indexes",
+      "op": "upsert",
+      "args": {
+        "generate_items": {
+          "count": 501,
+          "source_item_id_prefix": "sku-",
+          "template": { "type": "product", "name": "Generated", "availability": "available", "updated_at": "2026-10-23T09:00:00Z" }
+        }
+      },
+      "exchanges": [
+        {
+          "request": { "method": "POST", "path": "/v1/catalog/items/batch", "item_count": 500, "first_item_id": "sku-0", "last_item_id": "sku-499" },
+          "response": { "status": 200, "body": { "accepted": 500, "applied": 500, "unchanged": 0, "ignored_older": 0, "rejected": [] } }
+        },
+        {
+          "request": { "method": "POST", "path": "/v1/catalog/items/batch", "item_count": 1, "first_item_id": "sku-500", "last_item_id": "sku-500" },
+          "response": {
+            "status": 200,
+            "body": {
+              "accepted": 0,
+              "applied": 0,
+              "unchanged": 0,
+              "ignored_older": 0,
+              "rejected": [{ "index": 0, "source_item_id": "sku-500", "code": "invalid_price", "message": "price.amount_minor must be at least 0" }]
+            }
+          }
+        }
+      ],
+      "result": {
+        "accepted": 500,
+        "applied": 500,
+        "unchanged": 0,
+        "ignored_older": 0,
+        "rejected": [{ "index": 500, "source_item_id": "sku-500", "code": "invalid_price", "message": "price.amount_minor must be at least 0" }]
+      }
+    },
+    {
+      "name": "upsert_retries_429_with_retry_after_and_the_same_body",
+      "op": "upsert",
+      "args": {
+        "items": [
+          { "source_item_id": "sku-1", "type": "product", "name": "One", "availability": "available", "updated_at": "2026-10-23T09:00:00Z" }
+        ]
+      },
+      "exchanges": [
+        {
+          "request": { "method": "POST", "path": "/v1/catalog/items/batch", "item_ids": ["sku-1"] },
+          "response": { "status": 429, "headers": { "Retry-After": "0" }, "body": { "error": { "code": "rate_limited", "message": "slow down" } } }
+        },
+        {
+          "request": { "method": "POST", "path": "/v1/catalog/items/batch", "same_body_as_previous": true },
+          "response": { "status": 503, "headers": { "Retry-After": "0" } }
+        },
+        {
+          "request": { "method": "POST", "path": "/v1/catalog/items/batch", "same_body_as_previous": true },
+          "response": { "status": 200, "body": { "accepted": 1, "applied": 1, "unchanged": 0, "ignored_older": 0, "rejected": [] } }
+        }
+      ],
+      "result": { "accepted": 1, "applied": 1, "unchanged": 0, "ignored_older": 0, "rejected": [] }
+    },
+    {
+      "name": "upsert_with_no_items_sends_nothing",
+      "op": "upsert",
+      "args": { "items": [] },
+      "exchanges": [],
+      "result": { "accepted": 0, "applied": 0, "unchanged": 0, "ignored_older": 0, "rejected": [] }
+    },
+    {
+      "name": "delete_by_ids_uses_one_deleted_at",
+      "op": "delete",
+      "args": { "ids": ["sku-1", "sku-2"], "deleted_at": "2026-10-23T10:00:00Z" },
+      "exchanges": [
+        {
+          "request": {
+            "method": "POST",
+            "path": "/v1/catalog/items/delete",
+            "body": {
+              "items": [
+                { "source_item_id": "sku-1", "deleted_at": "2026-10-23T10:00:00Z" },
+                { "source_item_id": "sku-2", "deleted_at": "2026-10-23T10:00:00Z" }
+              ]
+            }
+          },
+          "response": { "status": 200, "body": { "deleted": 1, "ignored_older": 0, "not_found": 1, "rejected": [] } }
+        }
+      ],
+      "result": { "deleted": 1, "ignored_older": 0, "not_found": 1, "rejected": [] }
+    },
+    {
+      "name": "delete_items_with_their_own_deleted_at",
+      "op": "delete",
+      "args": {
+        "items": [
+          { "source_item_id": "sku-1", "deleted_at": "2026-10-23T10:00:00Z" },
+          { "source_item_id": "sku-9", "deleted_at": "2026-10-20T10:00:00.500Z" }
+        ]
+      },
+      "exchanges": [
+        {
+          "request": {
+            "method": "POST",
+            "path": "/v1/catalog/items/delete",
+            "body": {
+              "items": [
+                { "source_item_id": "sku-1", "deleted_at": "2026-10-23T10:00:00Z" },
+                { "source_item_id": "sku-9", "deleted_at": "2026-10-20T10:00:00.500Z" }
+              ]
+            }
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "deleted": 1,
+              "ignored_older": 1,
+              "not_found": 0,
+              "rejected": []
+            }
+          }
+        }
+      ],
+      "result": { "deleted": 1, "ignored_older": 1, "not_found": 0, "rejected": [] }
+    },
+    {
+      "name": "delete_chunks_at_1000",
+      "op": "delete",
+      "args": { "generate_ids": { "count": 1001, "prefix": "sku-" }, "deleted_at": "2026-10-23T10:00:00Z" },
+      "exchanges": [
+        {
+          "request": { "method": "POST", "path": "/v1/catalog/items/delete", "item_count": 1000, "first_item_id": "sku-0", "last_item_id": "sku-999" },
+          "response": { "status": 200, "body": { "deleted": 1000, "ignored_older": 0, "not_found": 0, "rejected": [] } }
+        },
+        {
+          "request": { "method": "POST", "path": "/v1/catalog/items/delete", "item_count": 1, "first_item_id": "sku-1000", "last_item_id": "sku-1000" },
+          "response": {
+            "status": 200,
+            "body": { "deleted": 0, "ignored_older": 0, "not_found": 0, "rejected": [{ "index": 0, "source_item_id": "sku-1000", "code": "invalid_item", "message": "deleted_at is in the future" }] }
+          }
+        }
+      ],
+      "result": {
+        "deleted": 1000,
+        "ignored_older": 0,
+        "not_found": 0,
+        "rejected": [{ "index": 1000, "source_item_id": "sku-1000", "code": "invalid_item", "message": "deleted_at is in the future" }]
+      }
+    },
+    {
+      "name": "begin_snapshot",
+      "op": "begin_snapshot",
+      "args": {},
+      "exchanges": [
+        {
+          "request": { "method": "POST", "path": "/v1/catalog/snapshots", "body": {} },
+          "response": { "status": 200, "body": { "snapshot_id": "snap_01HZX", "started_at": "2026-10-23T11:00:00Z" } }
+        }
+      ],
+      "result": { "snapshot_id": "snap_01HZX", "started_at": "2026-10-23T11:00:00Z" }
+    },
+    {
+      "name": "complete_snapshot",
+      "op": "complete_snapshot",
+      "args": { "snapshot_id": "snap_01HZX", "item_count": 42 },
+      "exchanges": [
+        {
+          "request": { "method": "POST", "path": "/v1/catalog/snapshots/snap_01HZX/complete", "body": { "item_count": 42 } },
+          "response": { "status": 200, "body": { "tombstoned": 3, "item_count": 42, "state": "ready" } }
+        }
+      ],
+      "result": { "tombstoned": 3, "item_count": 42, "state": "ready" }
+    },
+    {
+      "name": "complete_snapshot_not_open",
+      "op": "complete_snapshot",
+      "args": { "snapshot_id": "snap_OLD", "item_count": 42 },
+      "exchanges": [
+        {
+          "request": { "method": "POST", "path": "/v1/catalog/snapshots/snap_OLD/complete", "body": { "item_count": 42 } },
+          "response": { "status": 409, "body": { "error": { "code": "snapshot_not_open", "message": "snapshot is not open" } } }
+        }
+      ],
+      "error": { "status": 409, "code": "snapshot_not_open", "retryable": false }
+    },
+    {
+      "name": "complete_snapshot_refuses_a_bad_id_locally",
+      "op": "complete_snapshot",
+      "args": { "snapshot_id": "../items", "item_count": 1 },
+      "exchanges": [],
+      "error": { "local": true }
+    },
+    {
+      "name": "heartbeat_refreshed",
+      "op": "heartbeat",
+      "args": { "item_count": 42 },
+      "exchanges": [
+        {
+          "request": { "method": "POST", "path": "/v1/catalog/heartbeat", "body": { "item_count": 42 } },
+          "response": { "status": 200, "body": { "refreshed": true } }
+        }
+      ],
+      "result": { "refreshed": true }
+    },
+    {
+      "name": "heartbeat_count_mismatch",
+      "op": "heartbeat",
+      "args": { "item_count": 41 },
+      "exchanges": [
+        {
+          "request": { "method": "POST", "path": "/v1/catalog/heartbeat", "body": { "item_count": 41 } },
+          "response": { "status": 200, "body": { "refreshed": false, "reason": "count_mismatch", "stored_count": 42 } }
+        }
+      ],
+      "result": { "refreshed": false, "reason": "count_mismatch", "stored_count": 42 }
+    },
+    {
+      "name": "status",
+      "op": "status",
+      "args": {},
+      "exchanges": [
+        {
+          "request": { "method": "GET", "path": "/v1/catalog/status" },
+          "response": {
+            "status": 200,
+            "body": {
+              "connection_id": "conn_custom_1",
+              "provider": "custom_code",
+              "mode": "push",
+              "state": "ready",
+              "item_count": 42,
+              "available_count": 40,
+              "unclassified_count": 0,
+              "excluded_count": 2,
+              "freshness_seconds": 7200,
+              "newest_fresh_as_of": "2026-10-23T11:00:00Z",
+              "last_success_at": "2026-10-23T11:00:00Z",
+              "last_push_at": "2026-10-23T11:00:00Z",
+              "last_heartbeat_at": null,
+              "last_error": null,
+              "issue_count": 0,
+              "rejected_host": null,
+              "repair": "none",
+              "repair_path": ""
+            }
+          }
+        }
+      ],
+      "result": {
+        "connection_id": "conn_custom_1",
+        "provider": "custom_code",
+        "mode": "push",
+        "state": "ready",
+        "item_count": 42,
+        "available_count": 40,
+        "unclassified_count": 0,
+        "excluded_count": 2,
+        "freshness_seconds": 7200,
+        "newest_fresh_as_of": "2026-10-23T11:00:00Z",
+        "last_success_at": "2026-10-23T11:00:00Z",
+        "last_push_at": "2026-10-23T11:00:00Z",
+        "last_heartbeat_at": null,
+        "last_error": null,
+        "issue_count": 0,
+        "rejected_host": null,
+        "repair": "none",
+        "repair_path": ""
+      }
+    },
+    {
+      "name": "server_key_required",
+      "op": "upsert",
+      "args": {
+        "items": [{ "source_item_id": "sku-1", "type": "product", "name": "One", "availability": "available", "updated_at": "2026-10-23T09:00:00Z" }]
+      },
+      "exchanges": [
+        {
+          "request": { "method": "POST", "path": "/v1/catalog/items/batch", "item_ids": ["sku-1"] },
+          "response": { "status": 403, "body": { "error": { "code": "server_key_required", "message": "Catalog push requires a server key." } } }
+        }
+      ],
+      "error": { "status": 403, "code": "server_key_required", "retryable": false }
+    },
+    {
+      "name": "push_disabled_by_owner",
+      "op": "upsert",
+      "args": {
+        "items": [{ "source_item_id": "sku-1", "type": "product", "name": "One", "availability": "available", "updated_at": "2026-10-23T09:00:00Z" }]
+      },
+      "exchanges": [
+        {
+          "request": { "method": "POST", "path": "/v1/catalog/items/batch", "item_ids": ["sku-1"] },
+          "response": { "status": 409, "body": { "code": "catalog_push_disabled" } }
+        }
+      ],
+      "error": { "status": 409, "code": "catalog_push_disabled", "retryable": false }
+    },
+    {
+      "name": "publishable_key_is_refused_without_a_request",
+      "op": "upsert",
+      "api_key": "wpk_live_abc",
+      "args": {
+        "items": [{ "source_item_id": "sku-1", "type": "product", "name": "One", "availability": "available", "updated_at": "2026-10-23T09:00:00Z" }]
+      },
+      "exchanges": [],
+      "error": { "configuration": true }
+    }
+  ]
+}

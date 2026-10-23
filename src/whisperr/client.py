@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from typing import Any, Callable, Deque, Dict, List, Optional, Sequence
 
 from ._version import __version__
+from .catalog import CatalogClient
 from .errors import WhisperrError
 from .transport import Transport
 
@@ -49,10 +50,16 @@ class Whisperr:
         debug: bool = False,
         on_error: Optional[OnError] = None,
         transport: Optional[Transport] = None,
+        catalog_max_retries: int = 5,
+        catalog_timeout: float = 30.0,
     ) -> None:
         if not api_key and not disabled:
             raise ValueError("api_key is required")
         self._muted = bool(disabled)
+        self._catalog_options = dict(
+            api_key=api_key, base_url=base_url, max_retries=catalog_max_retries, timeout=catalog_timeout
+        )
+        self._catalog: Optional[CatalogClient] = None
         self._flush_at = flush_at
         self._max_batch = min(max_batch_size, 500)
         self._max_queue = max_queue_size
@@ -89,6 +96,15 @@ class Whisperr:
     @property
     def ready(self) -> bool:
         return not self._muted
+
+    @property
+    def catalog(self) -> CatalogClient:
+        """Catalog push: upsert and delete items, full-sync snapshots,
+        heartbeat and status. Needs a server key (``wrk_...``). Calls are sent
+        right away, not queued."""
+        if self._catalog is None:
+            self._catalog = CatalogClient(disabled=self._muted, **self._catalog_options)  # type: ignore[arg-type]
+        return self._catalog
 
     def identify(
         self,

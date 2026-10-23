@@ -13,7 +13,20 @@ trial expiry, usage drops), so this is where Whisperr gets its best signal.
 
 from ._version import __version__
 from .billing import BillingEvent
+from .catalog import CatalogClient
 from .client import SDK_NAME, Whisperr
-from .errors import WhisperrError
+from .errors import WhisperrCatalogError, WhisperrConfigurationError, WhisperrError
+from .money import currency_exponent, to_minor_units
 
-__all__ = ["BillingEvent", "SDK_NAME", "Whisperr", "WhisperrError", "__version__"]
+__all__ = [
+    "BillingEvent",
+    "CatalogClient",
+    "SDK_NAME",
+    "Whisperr",
+    "WhisperrCatalogError",
+    "WhisperrConfigurationError",
+    "WhisperrError",
+    "__version__",
+    "currency_exponent",
+    "to_minor_units",
+]
